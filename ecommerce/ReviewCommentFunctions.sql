@@ -53,6 +53,42 @@ BEGIN
 END;
 $$;
 
+-- Retrieve a member's reviews with the product name for display.
+CREATE OR REPLACE FUNCTION public.get_reviews(
+    p_member_id INTEGER
+)
+RETURNS TABLE (
+    review_id INTEGER,
+    product_id INTEGER,
+    product_name VARCHAR(255),
+    rating SMALLINT,
+    review_text TEXT,
+    created_at TIMESTAMP WITHOUT TIME ZONE,
+    updated_at TIMESTAMP WITHOUT TIME ZONE
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF p_member_id IS NULL THEN
+        RAISE EXCEPTION 'Member is required.';
+    END IF;
+
+    RETURN QUERY
+    SELECT r.id,
+           r.product_id,
+           p.name,
+           r.rating,
+           r.review_text,
+           r.created_at,
+           r.updated_at
+    FROM public.review AS r
+    JOIN public.product AS p
+        ON p.id = r.product_id
+    WHERE r.member_id = p_member_id
+    ORDER BY r.created_at DESC, r.id DESC;
+END;
+$$;
+
 -- Update a review only when it belongs to the member making the request.
 CREATE OR REPLACE FUNCTION public.update_review(
     p_review_id INTEGER,
