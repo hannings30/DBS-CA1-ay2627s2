@@ -38,11 +38,12 @@ CREATE TABLE IF NOT EXISTS public.comment (
         CHECK (BTRIM(comment_text) <> ''),
 
     -- A reply must refer to a parent comment in the same review.
-    -- A comment with replies cannot be deleted until those replies are removed.
+    -- Deleting a review removes its whole comment tree. The delete_comment
+    -- function will protect individual comments that still have replies.
     CONSTRAINT uq_comment_id_and_review UNIQUE (id, review_id),
     CONSTRAINT fk_comment_parent_same_review
         FOREIGN KEY (parent_comment_id, review_id)
-        REFERENCES public.comment(id, review_id) ON DELETE RESTRICT
+        REFERENCES public.comment(id, review_id) ON DELETE CASCADE
 );
 
 -- Indexes support common lookups by product, member, review, and parent.

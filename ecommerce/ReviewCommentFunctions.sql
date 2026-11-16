@@ -137,3 +137,39 @@ BEGIN
     RETURN p_review_id;
 END;
 $$;
+
+-- Delete a review only when it belongs to the member making the request.
+CREATE OR REPLACE FUNCTION public.delete_review(
+    p_review_id INTEGER,
+    p_member_id INTEGER
+)
+RETURNS INTEGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_review_count INTEGER;
+BEGIN
+    IF p_review_id IS NULL THEN
+        RAISE EXCEPTION 'Review is required.';
+    END IF;
+
+    IF p_member_id IS NULL THEN
+        RAISE EXCEPTION 'Member is required.';
+    END IF;
+
+    SELECT COUNT(*) INTO v_review_count
+    FROM public.review
+    WHERE id = p_review_id
+      AND member_id = p_member_id;
+
+    IF v_review_count = 0 THEN
+        RAISE EXCEPTION 'Review not found or you do not have permission to delete it.';
+    END IF;
+
+    DELETE FROM public.review
+    WHERE id = p_review_id
+      AND member_id = p_member_id;
+
+    RETURN p_review_id;
+END;
+$$;
