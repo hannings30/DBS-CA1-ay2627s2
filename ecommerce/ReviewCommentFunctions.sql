@@ -173,3 +173,89 @@ BEGIN
     RETURN p_review_id;
 END;
 $$;
+
+-- Create a top-level comment or a reply on a review.
+CREATE OR REPLACE FUNCTION public.create_comment(
+    p_review_id INTEGER,
+    p_member_id INTEGER,
+    p_parent_comment_id INTEGER,
+    p_comment_text TEXT
+)
+RETURNS INTEGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_review_count INTEGER;
+    v_review_author_id INTEGER;
+    v_parent_count INTEGER;
+    v_parent_author_count INTEGER;
+    v_comment_id INTEGER;
+BEGIN
+    IF p_review_id IS NULL THEN
+        RAISE EXCEPTION 'Review is required.';
+    END IF;
+
+    IF p_member_id IS NULL THEN
+        RAISE EXCEPTION 'Member is required.';
+    END IF;
+
+    IF p_comment_text IS NULL OR BTRIM(p_comment_text) = '' THEN
+        RAISE EXCEPTION 'Comment text cannot be empty.';
+    END IF;
+
+    SELECT COUNT(*) INTO v_review_count
+    FROM public.review
+    WHERE id = p_review_id;
+
+    IF v_review_count = 0 THEN
+        RAISE EXCEPTION 'Review not found.';
+    END IF;
+
+    SELECT member_id INTO v_review_author_id
+    FROM public.review
+    WHERE id = p_review_id;
+
+    IF p_parent_comment_id IS NULL THEN
+        IF p_member_id = v_review_author_id THEN
+            RAISE EXCEPTION 'The review author cannot add a top-level comment to their own review.';
+        END IF;
+    ELSE
+        SELECT COUNT(*) INTO v_parent_count
+        FROM public.comment
+        WHERE id = p_parent_comment_id
+          AND review_id = p_review_id;
+
+        IF v_parent_count = 0 THEN
+            RAISE EXCEPTION 'Parent comment must belong to this review.';
+        END IF;
+
+        IF p_member_id = v_review_author_id THEN
+            SELECT COUNT(*) INTO v_parent_author_count
+            FROM public.comment
+            WHERE id = p_parent_comment_id
+              AND review_id = p_review_id
+              AND member_id <> v_review_author_id;
+
+            IF v_parent_author_count = 0 THEN
+                RAISE EXCEPTION 'The review author can reply only to another member''s comment.';
+            END IF;
+        END IF;
+    END IF;
+
+    INSERT INTO public.comment (
+        review_id,
+        member_id,
+        parent_comment_id,
+        comment_text
+    )
+    VALUES (
+        p_review_id,
+        p_member_id,
+        p_parent_comment_id,
+        BTRIM(p_comment_text)
+    )
+    RETURNING id INTO v_comment_id;
+
+    RETURN v_comment_id;
+END;
+$$;
