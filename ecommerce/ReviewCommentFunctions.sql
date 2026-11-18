@@ -259,3 +259,49 @@ BEGIN
     RETURN v_comment_id;
 END;
 $$;
+
+-- Retrieve a review's comments in creation order, including reply links.
+CREATE OR REPLACE FUNCTION public.get_comments(
+    p_review_id INTEGER
+)
+RETURNS TABLE (
+    comment_id INTEGER,
+    review_id INTEGER,
+    member_id INTEGER,
+    member_username VARCHAR(50),
+    parent_comment_id INTEGER,
+    comment_text TEXT,
+    created_at TIMESTAMP WITHOUT TIME ZONE
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_review_count INTEGER;
+BEGIN
+    IF p_review_id IS NULL THEN
+        RAISE EXCEPTION 'Review is required.';
+    END IF;
+
+    SELECT COUNT(*) INTO v_review_count
+    FROM public.review
+    WHERE id = p_review_id;
+
+    IF v_review_count = 0 THEN
+        RAISE EXCEPTION 'Review not found.';
+    END IF;
+
+    RETURN QUERY
+    SELECT c.id,
+           c.review_id,
+           c.member_id,
+           m.username,
+           c.parent_comment_id,
+           c.comment_text,
+           c.created_at
+    FROM public.comment AS c
+    JOIN public.member AS m
+        ON m.id = c.member_id
+    WHERE c.review_id = p_review_id
+    ORDER BY c.created_at, c.id;
+END;
+$$;
